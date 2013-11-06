@@ -23,13 +23,16 @@ namespace PGSQLtoSQLServer
             InitializeComponent();
         }
 
-
         private void btnConvert_Click(object sender, EventArgs e)
         {
+            SqlConnection cnnSql = new SqlConnection("server=.;Database=" + txtSQLServer.Text + ";trusted_connection=true");
+            cnnSql.Open();
 
             string constr = String.Format("Server={0};Port={1};" + "User Id={2};Password={3};Database={4};", "localhost", "5432", "postgres", "anka", txtPGSQL.Text);
 
             NpgsqlConnection cnn = new NpgsqlConnection(constr);
+
+
             NpgsqlCommand cmd = new NpgsqlCommand();
             cmd.Connection = cnn;
             cmd.CommandText = "SELECT table_name FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE' AND table_schema = 'public' AND table_name != 'spatial_ref_sys'";
@@ -76,116 +79,136 @@ namespace PGSQLtoSQLServer
 
             }
 
-            dataGridView1.DataSource = columns;
 
+            dataGridView1.DataSource = columns;
 
             Server s = new Server(@".");
 
             Database d = s.Databases[txtSQLServer.Text];
-
-            List<string> columnName = new List<string>();
+            List<TableColumns> clmSql = new List<TableColumns>();
             foreach (var t in tables)
             {
 
                 Table tb = new Table(d, t.Name);
+                NpgsqlDataAdapter da = new NpgsqlDataAdapter("select * from " + t.Name + "", cnn);
+
+                DataTable dtb = new DataTable();
+                da.Fill(dtb);
+                dataGridView2.DataSource = dtb;
+                TableColumns cl = new TableColumns();
 
                 foreach (var c in columns)
                 {
+
                     if (c.TableName == t.Name)
                     {
+
+                        SqlConnection con = new SqlConnection("Server=.;Database=" + txtSQLServer.Text + ";trusted_connection=true");
+                        con.Open();
+
+                        Column clmn = new Column(tb, c.Name);
+                        cl.Name = clmn.Name;
+                        cl.TableName = tb.ToString();
+
                         if (c.DataType == "double precision")
                         {
-
-                            Column clm = new Column(tb, c.Name, Microsoft.SqlServer.Management.Smo.DataType.Float);
-                            tb.Columns.Add(clm);
-
+                            clmn.DataType = Microsoft.SqlServer.Management.Smo.DataType.Float;
+                            tb.Columns.Add(clmn);
+                            cl.DataType = clmn.DataType.ToString();
                         }
                         else if (c.DataType.Contains("character"))
                         {
+
                             if (c.MaxLength <= 255)
                             {
-                                Column clm = new Column(tb, c.Name, Microsoft.SqlServer.Management.Smo.DataType.VarChar(c.MaxLength));
-                                tb.Columns.Add(clm);
+                                clmn.DataType = Microsoft.SqlServer.Management.Smo.DataType.VarChar(c.MaxLength);
                             }
                             else
                             {
-                                Column clm = new Column(tb, c.Name, Microsoft.SqlServer.Management.Smo.DataType.Text);
-                                tb.Columns.Add(clm);
+                                clmn.DataType = Microsoft.SqlServer.Management.Smo.DataType.Text;
                             }
+                            tb.Columns.Add(clmn);
+                            cl.MaxLength = c.MaxLength;
+                            cl.DataType = clmn.DataType.ToString();
 
                         }
                         else if (c.DataType == "integer")
                         {
-                            Column clm = new Column(tb, c.Name, Microsoft.SqlServer.Management.Smo.DataType.Int);
-                            tb.Columns.Add(clm);
-                        }
+                            clmn.DataType = Microsoft.SqlServer.Management.Smo.DataType.Int;
+                            tb.Columns.Add(clmn);
+                            cl.DataType = clmn.DataType.ToString();
 
+                        }
 
                         else if (c.Name == "geom")
                         {
-                            Column clm = new Column(tb, c.Name, Microsoft.SqlServer.Management.Smo.DataType.Geometry);
-                            tb.Columns.Add(clm);
+                            clmn.DataType = Microsoft.SqlServer.Management.Smo.DataType.Geometry;
+                            tb.Columns.Add(clmn);
+                            cl.DataType = clmn.DataType.ToString();
                         }
 
-                        columnName.Add(c.Name);
 
                     }
-
+                    clmSql.Add(cl);
                 }
 
-                foreach (var table in tables)
+                if (!d.Tables.Contains(tb.Name))
                 {
-                    //NpgsqlDataAdapter da = new NpgsqlDataAdapter("select gid from  " + table.Name + "", cnn);
+                    tb.Create();
+                }
+                //MessageBox.Show(dtb.TableName);
 
-                    //DataTable dtbl = new DataTable();
 
-                    //da.Fill(dtbl);
-
-                    //dataGridView2.DataSource = dtbl;
-                    
-                    foreach (var  column in columns)
+                for (int i = 0; i < dtb.Rows.Count; i++)
+                {
+                    for (int j = 0; j < dtb.Columns.Count; j++)
                     {
-                        if (column.TableName==table.Name & column.Name!="geom")
+                        if (tb.Columns[j].Name != "geom")
                         {
-                            
-                            //datalar sqlservera atılacak
-                           
-                            //NpgsqlDataAdapter da = new NpgsqlDataAdapter("select " + column.Name + " from " + table.Name + "",cnn);
-                     
-                            //DataTable dtbl=new DataTable();
-                            //da.Fill(dtbl);
-                            //dataGridView2.DataSource=dtbl;
-                            //while (rdr3.Read())
-                            //{
-                            //    NpgsqlCommand cmdSql = new NpgsqlCommand("insert into "+table.Name+"("+column.Name+")""  values ()" ");
-                            //}
+                            SqlCommand cmdData = new SqlCommand("insert into " + t.Name + "(" + dtb.Columns[j].ColumnName + ")  values('" + dtb.Rows[i][j] + "')", cnnSql);
+                            cmdData.ExecuteNonQuery();
+                        }
 
-                        }
-                        else
-                        {
-                            //burada srid ve tip dönüşümü latin=>utf8 yapılacak
-                        }
                     }
+
                 }
-                //if (d.Tables.Contains(tb.Name)) //tablo databasede varsa refresh etsin
+
+
+                //DataTable dtbl = new DataTable();
+                //foreach (var cSql in clmSql)
                 //{
-                //    tb.Refresh();
+                //    foreach (var cPG in columns)
+                //    {
+
+                //        NpgsqlDataAdapter da = new NpgsqlDataAdapter("select " + cPG.Name + " from " + cPG.TableName + "", cnn);
+                //        da.Fill(dtbl);
+                //        dataGridView2.DataSource = dtbl;
+
+                //    }
+
                 //}
-                //else //yoksa yeni eklesin
+                //DataTable dt2 = new DataTable();
+                //foreach (var tbl  in tables)
                 //{
-                tb.Create();
-                cnn.Close();
-                
-
-                foreach (var msg in columnName)
-                {
-                    lstMessage.Items.Add("Created column " + msg.ToString() + " on " + tb.Name);
-                }
-
+                //    foreach (var clm in columns)
+                //    {
+                //        if (tbl.Name==clm.TableName & clm.Name!="geom")
+                //        {
+                //            NpgsqlDataAdapter dAdapter = new NpgsqlDataAdapter("select "+clm.Name+" from "+clm.TableName+"",cnn);
+                //            dAdapter.Fill(dt2);
+                //            dataGridView2.DataSource = dt2;
+                //        }
+                //    }
                 //}
 
             }
+
+
+
         }
 
+
     }
+
+
 }

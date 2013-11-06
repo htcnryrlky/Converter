@@ -15,5 +15,6 @@ namespace PGSQLtoSQLServer.Models
         public string TableName { get; set; }
 
         public int MaxLength { get; set; }
+
     }
 }

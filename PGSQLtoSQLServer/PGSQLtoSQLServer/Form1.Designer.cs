@@ -64,6 +64,7 @@
             this.txtPGSQL.Name = "txtPGSQL";
             this.txtPGSQL.Size = new System.Drawing.Size(138, 20);
             this.txtPGSQL.TabIndex = 2;
+            this.txtPGSQL.Text = "postgis_21_sample";
             // 
             // txtSQLServer
             // 
@@ -71,6 +72,7 @@
             this.txtSQLServer.Name = "txtSQLServer";
             this.txtSQLServer.Size = new System.Drawing.Size(138, 20);
             this.txtSQLServer.TabIndex = 3;
+            this.txtSQLServer.Text = "db_Gungoren";
             // 
             // label1
             // 
