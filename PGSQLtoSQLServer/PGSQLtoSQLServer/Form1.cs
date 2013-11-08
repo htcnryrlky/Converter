@@ -23,6 +23,7 @@ namespace PGSQLtoSQLServer
             InitializeComponent();
         }
 
+
         private void btnConvert_Click(object sender, EventArgs e)
         {
             SqlConnection cnnSql = new SqlConnection("server=.;Database=" + txtSQLServer.Text + ";trusted_connection=true");
